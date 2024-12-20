@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Joystick Controlled Game with Enemy</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #1d1d1d;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      text-align: center;
+    }
+    canvas {
+      display: none; /* Hide canvas initially */
+      background: #5da7f0;
+    }
+    .joystick {
+      position: absolute;
+      bottom: 50px;
+      left: 50px;
+      width: 120px;
+      height: 120px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      touch-action: none;
+      display: none; /* Hide joystick initially */
+    }
+    .joystick-knob {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 60px;
+      height: 60px;
+      background: white;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      touch-action: none;
+    }
+    #startButton {
+      padding: 20px 40px;
+      font-size: 24px;
+      color: white;
+      background-color: #4CAF50;
+      border: none;
+      cursor: pointer;
+      border-radius: 10px;
+    }
+    #startButton:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Start button -->
+  <button id="startButton">Start Game</button>
+
+  <canvas id="gameCanvas"></canvas>
+  <div class="joystick">
+    <div class="joystick-knob"></div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const startButton = document.getElementById('startButton');
+
+    // Resize canvas to fit the window
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // Player object
+    const player = {
+      x: canvas.width / 2,
+      y: canvas.height / 2,
+      width: 50,
+      height: 50,
+      color: 'red',
+      speed: 3,
+    };
+
+    // Enemy object
+    const enemy = {
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      width: 50,
+      height: 50,
+      color: 'green',
+      speed: 1.5,
+      moveDirection: { x: 1, y: 1 }, // Random initial direction
+    };
+
+    // Joystick variables
+    const joystick = document.querySelector('.joystick');
+    const knob = document.querySelector('.joystick-knob');
+    const maxDistance = 50; // Max knob travel distance
+    const center = { x: joystick.offsetWidth / 2, y: joystick.offsetHeight / 2 };
+    let joystickInput = { x: 0, y: 0 };
+    let isMoving = false;
+
+    // Touch events for joystick
+    knob.addEventListener('touchstart', () => { isMoving = true; });
+
+    knob.addEventListener('touchmove', (event) => {
+      if (!isMoving) return;
+
+      const touch = event.touches[0];
+      const rect = joystick.getBoundingClientRect();
+      const dx = touch.clientX - (rect.left + center.x);
+      const dy = touch.clientY - (rect.top + center.y);
+
+      // Limit the knob's position within maxDistance
+      const distance = Math.min(Math.sqrt(dx * dx + dy * dy), maxDistance);
+      const angle = Math.atan2(dy, dx);
+
+      knob.style.transform = `translate(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px)`;
+
+      // Normalize joystick input
+      joystickInput.x = (distance / maxDistance) * Math.cos(angle);
+      joystickInput.y = (distance / maxDistance) * Math.sin(angle);
+    });
+
+    knob.addEventListener('touchend', () => {
+      isMoving = false;
+      joystickInput = { x: 0, y: 0 };
+      knob.style.transform = 'translate(-50%, -50%)'; // Reset to center
+    });
+
+    // Player movement and boundary logic
+    function updatePlayer() {
+      player.x += joystickInput.x * player.speed;
+      player.y += joystickInput.y * player.speed;
+
+      // Prevent the player from going out of canvas bounds
+      player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+      player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+    }
+
+    // Enemy movement logic
+    function moveEnemy() {
+      // Move enemy in random direction
+      enemy.x += enemy.moveDirection.x * enemy.speed;
+      enemy.y += enemy.moveDirection.y * enemy.speed;
+
+      // Bounce the enemy off canvas boundaries
+      if (enemy.x <= 0 || enemy.x >= canvas.width - enemy.width) {
+        enemy.moveDirection.x *= -1;
+      }
+      if (enemy.y <= 0 || enemy.y >= canvas.height - enemy.height) {
+        enemy.moveDirection.y *= -1;
+      }
+    }
+
+    // Collision detection (Player vs. Enemy)
+    function checkCollision() {
+      if (
+        player.x < enemy.x + enemy.width &&
+        player.x + player.width > enemy.x &&
+        player.y < enemy.y + enemy.height &&
+        player.y + player.height > enemy.y
+      ) {
+        alert('Game Over! The enemy hit you!');
+        resetGame();
+      }
+    }
+
+    // Draw the player, enemy, and everything
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
+
+      // Draw player
+      ctx.fillStyle = player.color;
+      ctx.fillRect(player.x, player.y, player.width, player.height);
+
+      // Draw enemy
+      ctx.fillStyle = enemy.color;
+      ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+    }
+
+    // Reset the game if the player is hit by the enemy
+    function resetGame() {
+      player.x = canvas.width / 2;
+      player.y = canvas.height / 2;
+    }
+
+    // Game loop function
+    function gameLoop() {
+      updatePlayer(); // Update player position based on joystick
+      moveEnemy(); // Move enemy on the canvas
+      checkCollision(); // Check if player and enemy collided
+      draw(); // Draw player and enemy on the screen
+      requestAnimationFrame(gameLoop); // Loop the game
+    }
+
+    // Start the game when the Start button is clicked
+    startButton.addEventListener('click', () => {
+      // Hide the start button
+      startButton.style.display = 'none';
+
+      // Show the game canvas and joystick
+      canvas.style.display = 'block';
+      joystick.style.display = 'block';
+
+      gameLoop(); // Start the game loop
+    });
+  </script>
+</body>
+  </html>
+  
